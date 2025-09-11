@@ -23,5 +23,10 @@
     "sensitive": false,
     "type": "string",
     "value": "arn:aws:iam::022499046282:role/devops-task-ecs-exec-role"
+  },
+  "task_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::022499046282:role/devops-task-ecs-task-role"
   }
 }
