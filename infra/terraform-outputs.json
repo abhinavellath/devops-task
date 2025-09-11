@@ -1,0 +1,27 @@
+{
+  "alb_dns": {
+    "sensitive": false,
+    "type": "string",
+    "value": "devops-task-alb-453312658.us-east-1.elb.amazonaws.com"
+  },
+  "ecr_repo_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "022499046282.dkr.ecr.us-east-1.amazonaws.com/devops-task-ecr"
+  },
+  "ecs_cluster": {
+    "sensitive": false,
+    "type": "string",
+    "value": "devops-task-cluster"
+  },
+  "ecs_service": {
+    "sensitive": false,
+    "type": "string",
+    "value": "devops-task-service"
+  },
+  "exec_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::022499046282:role/devops-task-ecs-exec-role"
+  }
+}
