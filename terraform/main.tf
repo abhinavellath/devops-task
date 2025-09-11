@@ -103,7 +103,7 @@ resource "aws_ecs_task_definition" "task" {
       image = "amazon/amazon-ecs-sample" # placeholder until Jenkins pushes
       essential = true
       portMappings = [
-        { containerPort = 8080, hostPort = 8080, protocol = "tcp" }
+        { containerPort = 3000, hostPort = 3000, protocol = "tcp" }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -132,7 +132,7 @@ resource "aws_ecs_service" "service" {
   load_balancer {
     target_group_arn = aws_lb_target_group.tg.arn
     container_name   = "app"
-    container_port   = 8080
+    container_port   = 3000
   }
 
   depends_on = [aws_lb_listener.http]
