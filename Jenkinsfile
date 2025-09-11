@@ -4,8 +4,8 @@ pipeline {
     AWS_REGION = "us-east-1"
     ECR_REPO = "ecr-repo" 
     IMAGE_TAG = "${env.BUILD_NUMBER}"
-    CLUSTER = "devops-task-cluster"   // use value from terraform-outputs.json if desired
-    SERVICE = "devops-task-service"   // use value from terraform-outputs.json if desired
+    CLUSTER = "devops-task-cluster"   
+    SERVICE = "devops-task-service" 
     TASK_FAMILY = "task-def"
   }
   stages {
