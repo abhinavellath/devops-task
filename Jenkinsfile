@@ -4,8 +4,8 @@ pipeline {
     AWS_REGION = "us-east-1"
     ECR_REPO = "ecr-repo" 
     IMAGE_TAG = "${env.BUILD_NUMBER}"
-    CLUSTER = "task-cluster"
-    SERVICE = "task-service"
+    CLUSTER = "devops-task-cluster"   // use value from terraform-outputs.json if desired
+    SERVICE = "devops-task-service"   // use value from terraform-outputs.json if desired
     TASK_FAMILY = "task-def"
   }
   stages {
@@ -49,27 +49,58 @@ pipeline {
       }
       archiveArtifacts artifacts: 'image_uri.txt', onlyIfSuccessful: true
     }
+    stage('Load Terraform Outputs') {
+      steps {
+        sh '''
+          if [ ! -f infra/terraform-outputs.json ]; then
+            echo "ERROR: infra/terraform-outputs.json not found"
+            exit 1
+          fi
+
+          EXEC_ROLE_ARN=$(jq -r .exec_role_arn.value infra/terraform-outputs.json)
+          TASK_ROLE_ARN=$(jq -r .task_role_arn.value infra/terraform-outputs.json || echo $EXEC_ROLE_ARN)
+          CLUSTER=$(jq -r .ecs_cluster.value infra/terraform-outputs.json)
+          SERVICE=$(jq -r .ecs_service.value infra/terraform-outputs.json)
+
+          echo "EXEC_ROLE_ARN=$EXEC_ROLE_ARN" > tf.env
+          echo "TASK_ROLE_ARN=$TASK_ROLE_ARN" >> tf.env
+          echo "CLUSTER=$CLUSTER" >> tf.env
+          echo "SERVICE=$SERVICE" >> tf.env
+        '''
+        script {
+          def tf = readFile('tf.env').split("\n").collectEntries { line ->
+            def (k,v) = line.split('=')
+            [(k): v]
+          }
+          env.EXEC_ROLE_ARN = tf['EXEC_ROLE_ARN']
+          env.TASK_ROLE_ARN = tf['TASK_ROLE_ARN']
+          env.CLUSTER = tf['CLUSTER']
+          env.SERVICE = tf['SERVICE']
+        }
+      }
+    }
     stage('Deploy: Register Task Definition & Update Service') {
       steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
-            IMAGE="$(cat image_uri.txt | cut -d'=' -f2)"
-            
-            # prepare container definitions (replace image placeholder into template)
-            cat taskdef.json.template | sed "s|__IMAGE__|${IMAGE}|g" > taskdef.json
+            IMAGE=$(cat image_uri.txt | cut -d'=' -f2)
+
+            # prepare task definition from template (replace all placeholders)
+            sed -e "s|__IMAGE__|${IMAGE}|g" \
+                -e "s|__EXEC_ROLE_ARN__|${EXEC_ROLE_ARN}|g" \
+                -e "s|__TASK_ROLE_ARN__|${TASK_ROLE_ARN}|g" \
+                taskdef.json.template > taskdef.json
 
             # register new task definition
             aws ecs register-task-definition \
               --region ${AWS_REGION} \
               --cli-input-json file://taskdef.json > register-output.json
 
-            # get revision
+            # get task definition ARN
             TD_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' register-output.json)
             echo "Registered task definition: ${TD_ARN}"
 
-            # update service to use latest task definition (force new deployment)
+            # update ECS service with new task definition
             aws ecs update-service \
               --region ${AWS_REGION} \
               --cluster ${CLUSTER} \
@@ -77,8 +108,11 @@ pipeline {
               --task-definition ${TD_ARN} \
               --force-new-deployment
 
-            # show status
-            aws ecs describe-services --cluster ${CLUSTER} --services ${SERVICE} --region ${AWS_REGION} | jq '.services[0].deployments'
+            # show deployment status
+            aws ecs describe-services \
+              --region ${AWS_REGION} \
+              --cluster ${CLUSTER} \
+              --services ${SERVICE} | jq '.services[0].deployments'
           '''
         }
       }
