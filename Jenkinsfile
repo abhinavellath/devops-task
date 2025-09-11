@@ -33,22 +33,23 @@ pipeline {
       }
     }
     stage('AWS ECR Login & Push') {
-      steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-          sh '''
-            aws --version
-            aws configure set region ${AWS_REGION}
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
-            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-            docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
-            docker push ${ECR_URI}:${IMAGE_TAG}
-            echo "IMAGE_URI=${ECR_URI}:${IMAGE_TAG}" > image_uri.txt
-          '''
-        }
-      }
-      archiveArtifacts artifacts: 'image_uri.txt', onlyIfSuccessful: true
+  steps {
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+      sh '''
+        aws --version
+        aws configure set region ${AWS_REGION}
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
+        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+        docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
+        docker push ${ECR_URI}:${IMAGE_TAG}
+        echo "IMAGE_URI=${ECR_URI}:${IMAGE_TAG}" > image_uri.txt
+      '''
     }
+    archiveArtifacts artifacts: 'image_uri.txt', onlyIfSuccessful: true
+  }
+}
+
     stage('Load Terraform Outputs') {
       steps {
         sh '''
