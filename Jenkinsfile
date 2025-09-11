@@ -91,44 +91,47 @@ pipeline {
       }
     }
     stage('Deploy: Register Task Definition & Update Service') {
-      steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-          sh '''
-            IMAGE=$(cat image_uri.txt | cut -d'=' -f2)
+  steps {
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+      sh '''
+        # Read the pushed Docker image URI
+        IMAGE=$(cut -d= -f2 image_uri.txt)
 
-            # prepare task definition from template (replace all placeholders)
-            sed -e "s|__IMAGE__|${IMAGE}|g" \
-                -e "s|__EXEC_ROLE_ARN__|${EXEC_ROLE_ARN}|g" \
-                -e "s|__TASK_ROLE_ARN__|${TASK_ROLE_ARN}|g" \
-                taskdef.json.template > taskdef.json
+        echo "Using image: ${IMAGE}"
 
-            # register new task definition
-            aws ecs register-task-definition \
-              --region ${AWS_REGION} \
-              --cli-input-json file://taskdef.json > register-output.json
+        # Prepare task definition from template
+        sed -e "s|__IMAGE__|${IMAGE}|g" \
+            -e "s|__EXEC_ROLE_ARN__|${EXEC_ROLE_ARN}|g" \
+            -e "s|__TASK_ROLE_ARN__|${TASK_ROLE_ARN}|g" \
+            taskdef.json.template > taskdef.json
 
-            # get task definition ARN
-            TD_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' register-output.json)
-            echo "Registered task definition: ${TD_ARN}"
+        echo "Registering new ECS task definition..."
+        aws ecs register-task-definition \
+          --region ${AWS_REGION} \
+          --cli-input-json file://taskdef.json > register-output.json
 
-            # update ECS service with new task definition
-            aws ecs update-service \
-              --region ${AWS_REGION} \
-              --cluster ${CLUSTER} \
-              --service ${SERVICE} \
-              --task-definition ${TD_ARN} \
-              --force-new-deployment
+        # Extract the new task definition ARN
+        TD_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' register-output.json)
+        echo "Registered task definition ARN: ${TD_ARN}"
 
-            # show deployment status
-            aws ecs describe-services \
-              --region ${AWS_REGION} \
-              --cluster ${CLUSTER} \
-              --services ${SERVICE} | jq '.services[0].deployments'
-          '''
-        }
-      }
+        echo "Updating ECS service..."
+        aws ecs update-service \
+          --region ${AWS_REGION} \
+          --cluster ${CLUSTER} \
+          --service ${SERVICE} \
+          --task-definition ${TD_ARN} \
+          --force-new-deployment
+
+        echo "Fetching deployment status..."
+        aws ecs describe-services \
+          --region ${AWS_REGION} \
+          --cluster ${CLUSTER} \
+          --services ${SERVICE} | jq '.services[0].deployments'
+      '''
     }
-  } // stages
+  }
+}
+ // stages
   post {
     success {
       echo "Pipeline completed successfully. Visit the ALB/PUBLIC URL to verify."
