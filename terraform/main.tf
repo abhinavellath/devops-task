@@ -6,8 +6,11 @@ data "aws_vpc" "default" {
   default = true
 }
 
-data "aws_subnet_ids" "default" {
-  vpc_id = data.aws_vpc.default.id
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
 }
 
 resource "aws_ecr_repository" "app" {
@@ -18,8 +21,25 @@ resource "aws_ecr_repository" "app" {
   tags = { Project = var.app_name }
 }
 
+resource "aws_iam_role" "ecs_task_role" {
+  name = "${var.app_name}-ecs-task-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role" "ecs_task_execution" {
-  name = "${var.app_name}-ecs-exec-role"
+  name               = "${var.app_name}-ecs-exec-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
 }
 
@@ -36,6 +56,11 @@ data "aws_iam_policy_document" "ecs_task_assume_role" {
 resource "aws_iam_role_policy_attachment" "exec_attach" {
   role       = aws_iam_role.ecs_task_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_cloudwatch_log_group" "ecs_logs" {
+  name              = "/ecs/${var.app_name}"
+  retention_in_days = 3
 }
 
 resource "aws_security_group" "alb" {
@@ -57,22 +82,49 @@ resource "aws_security_group" "alb" {
   }
 }
 
+resource "aws_security_group" "ecs" {
+  name        = "${var.app_name}-ecs-sg"
+  description = "ECS tasks security group"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id] # allow only ALB
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_lb" "app" {
   name               = "${var.app_name}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = data.aws_subnet_ids.default.ids[0:2]
+  subnets            = data.aws_subnets.default.ids
 }
 
 resource "aws_lb_target_group" "tg" {
-  name     = "${var.app_name}-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = data.aws_vpc.default.id
+  name        = "${var.app_name}-tg"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = data.aws_vpc.default.id
+  target_type = "ip"
   health_check {
-    path = "/"
-  }
+  path = "/health"
+  port = "3000"
+  interval = 30
+  timeout  = 5
+  healthy_threshold   = 2
+  unhealthy_threshold = 2
+}
+
 }
 
 resource "aws_lb_listener" "http" {
@@ -96,20 +148,21 @@ resource "aws_ecs_task_definition" "task" {
   cpu                      = "256"
   memory                   = "512"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([
     {
-      name = "app"
-      image = "amazon/amazon-ecs-sample" # placeholder until Jenkins pushes
+      name      = "devops-task"
+      image     = "amazon/amazon-ecs-sample" # Jenkins will override later
       essential = true
       portMappings = [
-        { containerPort = 3000, hostPort = 3000, protocol = "tcp" }
+        { containerPort = 3000, protocol = "tcp" }
       ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          "awslogs-group" = "/ecs/${var.app_name}"
-          "awslogs-region" = var.aws_region
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
+          "awslogs-region"        = var.aws_region
           "awslogs-stream-prefix" = "ecs"
         }
       }
@@ -123,15 +176,16 @@ resource "aws_ecs_service" "service" {
   task_definition = aws_ecs_task_definition.task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+
   network_configuration {
-    subnets         = data.aws_subnet_ids.default.ids[0:2]
-    security_groups = [aws_security_group.alb.id]
+    subnets         = data.aws_subnets.default.ids
     assign_public_ip = true
+    security_groups  = [aws_security_group.ecs.id]
   }
 
   load_balancer {
     target_group_arn = aws_lb_target_group.tg.arn
-    container_name   = "app"
+    container_name   = "devops-task"
     container_port   = 3000
   }
 
