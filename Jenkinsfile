@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = "us-east-1"
-        ECR_REPO = "ecr-repo"
-        IMAGE_TAG = "${env.BUILD_NUMBER}"
-        CLUSTER = "devops-task-cluster"
-        SERVICE = "devops-task-service"
-        TASK_FAMILY = "task-def"
+        AWS_REGION   = "us-east-1"
+        ECR_REPO     = "ecr-repo"
+        IMAGE_TAG    = "${env.BUILD_NUMBER}"
+        CLUSTER      = "devops-task-cluster"
+        SERVICE      = "devops-task-service"
+        TASK_FAMILY  = "task-def"
     }
 
     stages {
@@ -33,7 +33,6 @@ pipeline {
 
         stage('Docker: Build') {
             steps {
-                sh "docker --version || true"
                 sh "docker build -t ${ECR_REPO}:${IMAGE_TAG} ."
             }
         }
@@ -42,7 +41,6 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
-                        aws --version
                         aws configure set region ${AWS_REGION}
                         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
                         ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
@@ -68,11 +66,6 @@ pipeline {
         stage('Load Terraform Outputs') {
             steps {
                 sh '''
-                    if [ ! -f infra/terraform-outputs.json ]; then
-                        echo "ERROR: infra/terraform-outputs.json not found"
-                        exit 1
-                    fi
-
                     EXEC_ROLE_ARN=$(jq -r .exec_role_arn.value infra/terraform-outputs.json)
                     TASK_ROLE_ARN=$(jq -r .task_role_arn.value infra/terraform-outputs.json || echo $EXEC_ROLE_ARN)
                     CLUSTER=$(jq -r .ecs_cluster.value infra/terraform-outputs.json)
@@ -100,14 +93,19 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
-                        # Read the pushed Docker image URI
                         IMAGE=$(cut -d= -f2 image_uri.txt)
                         echo "Using image: ${IMAGE}"
+
+                        # Ensure log group exists
+                        LOG_GROUP="/ecs/${TASK_FAMILY}"
+                        aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP" --region ${AWS_REGION} \
+                          || aws logs create-log-group --log-group-name "$LOG_GROUP" --region ${AWS_REGION}
 
                         # Prepare task definition from template
                         sed -e "s|__IMAGE__|${IMAGE}|g" \
                             -e "s|__EXEC_ROLE_ARN__|${EXEC_ROLE_ARN}|g" \
                             -e "s|__TASK_ROLE_ARN__|${TASK_ROLE_ARN}|g" \
+                            -e "s|__TASK_FAMILY__|${TASK_FAMILY}|g" \
                             taskdef.json.template > taskdef.json
 
                         echo "Registering new ECS task definition..."
@@ -115,7 +113,6 @@ pipeline {
                             --region ${AWS_REGION} \
                             --cli-input-json file://taskdef.json > register-output.json
 
-                        # Extract the new task definition ARN
                         TD_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' register-output.json)
                         echo "Registered task definition ARN: ${TD_ARN}"
 
@@ -137,7 +134,7 @@ pipeline {
             }
         }
 
-    } // End of stages
+    } // stages
 
     post {
         success {
@@ -147,4 +144,4 @@ pipeline {
             echo "Pipeline failed - check console output."
         }
     }
-} // End of pipeline
+}
