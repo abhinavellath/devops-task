@@ -1,15 +1,20 @@
-# Dockerfile
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-# if you have build step uncomment
-# RUN npm run build
+# Use official Node.js 18 Alpine image
+FROM node:18-alpine
 
-FROM node:18-alpine AS runtime
+# Set working directory
 WORKDIR /app
-COPY --from=builder /app . 
-ENV NODE_ENV=production
+
+# Copy package.json and package-lock.json
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy all app files (including logoswayatt.png and app.js)
+COPY . .
+
+# Expose port 3000 for the Express app
 EXPOSE 3000
-CMD ["node", "index.js"]
+
+# Start the app
+CMD ["node", "app.js"]
