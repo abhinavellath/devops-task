@@ -3,11 +3,11 @@ pipeline {
 
     environment {
         AWS_REGION   = "us-east-1"
-        ECR_REPO     = "ecr-repo"
+        ECR_REPO     = "devops-task-ecr"
         IMAGE_TAG    = "${env.BUILD_NUMBER}"
         CLUSTER      = "devops-task-cluster"
         SERVICE      = "devops-task-service"
-        TASK_FAMILY  = "task-def"
+        TASK_FAMILY  = "devops-task-task"
     }
 
     stages {
