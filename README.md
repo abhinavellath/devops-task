@@ -1,61 +1,168 @@
-# Logo Server
+DevOps Task – CI/CD on AWS ECS with Jenkins
+📌 Overview
 
-A simple Express.js web server that serves the Swayatt logo image.
+This project demonstrates a complete CI/CD pipeline for deploying a containerized Node.js application to AWS ECS (Fargate) using Jenkins, Docker, Terraform, and ECR.
 
-## What is this app?
+The pipeline:
 
-This is a lightweight Node.js application built with Express.js that serves a single logo image (`logoswayatt.png`) when accessed through a web browser. When you visit the root URL, the server responds by displaying the Swayatt logo.
+1. Builds a Docker image of the Node.js app.
 
-## Prerequisites
+2. Pushes the image to Amazon ECR (with both immutable build tag and latest).
 
-- Node.js (version 12 or higher)
-- npm (Node Package Manager)
+3. Registers a new ECS task definition.
 
-## Installation
+4. Updates the ECS service to run the new task.
 
-1. Clone or download this repository
-2. Navigate to the project directory:
-   ```bash
-   cd "devops task"
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
+5. Sends logs to CloudWatch for observability.
 
-## How to Start the App
 
-Run the following command:
-```bash
+🛠️ Tools & Services Used
+
+Application: Node.js + Express
+
+Containerization: Docker
+
+CI/CD: Jenkins (pipeline as code – Jenkinsfile)
+
+Cloud Provider: AWS
+
+Amazon ECR (image registry)
+
+Amazon ECS (Fargate launch type)
+
+Application Load Balancer (public ingress)
+
+CloudWatch Logs (logging)
+
+Infrastructure as Code: Terraform
+
+🚀 Setup & Deployment Guide
+1. Prerequisites
+
+AWS Account with IAM permissions for ECS, ECR, VPC, CloudWatch.
+
+Jenkins server (running on EC2/VM/Container).
+
+Installed locally (if testing without Jenkins):
+
+Docker
+
+AWS CLI (aws configure)
+
+Terraform
+
+Node.js
+
+2. Clone the repository
+git clone <your-repo-url>
+cd your-repo
+
+3. Run application locally (optional)
+```
+cd app
+npm install
 npm start
+# App runs on http://localhost:3000
+# Health check endpoint: http://localhost:3000/health
 ```
 
-The server will start and display:
-```
-Server running on http://localhost:3000
-```
+4. Build & Push Docker Image to ECR
 
-## Usage
-
-Once the server is running, open your web browser and navigate to:
+Authenticate with ECR:
 ```
-http://localhost:3000
+aws ecr get-login-password --region us-east-1 \
+  | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
 ```
 
-You will see the Swayatt logo displayed in your browser.
-
-## Project Structure
-
+Build and tag the image:
 ```
-├── app.js              # Main server file
-├── package.json        # Project dependencies and scripts
-├── logoswayatt.png     # Logo image file
-└── README.md          # This file
+docker build -t devops-task-ecr:3 .
+docker tag devops-task-ecr:3 <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/devops-task-ecr:3
 ```
 
-## Technical Details
+Push to ECR:
+```
+docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/devops-task-ecr:3
+```
 
-- **Framework**: Express.js
-- **Port**: 3000
-- **Endpoint**: GET `/` - serves the logo image
-- **File served**: `logoswayatt.png`
+5. Provision Infrastructure with Terraform ( Run locally on local 
+```
+cd infra
+terraform init
+terraform apply -auto-approve
+```
+
+Terraform will create:
+
+ECS Cluster
+
+Task Definition & Service
+
+ALB + Target Group + Listener
+
+Security Groups
+
+CloudWatch Log Group
+
+6. Jenkins CI/CD Pipeline
+
+Add your GitHub repo to Jenkins (multibranch or pipeline job).
+
+Jenkinsfile pipeline stages:
+
+Checkout – pull code from GitHub
+
+Install & Test – install Node dependencies & run tests
+
+Docker Build – build app image
+
+ECR Push – push image to AWS ECR
+
+Terraform Apply – apply infra changes
+
+Deploy to ECS – update ECS service with new task definition
+
+Trigger: on push to main branch.
+
+7. Access the Application
+
+Once deployed, the application is accessible via the ALB DNS name:
+```
+curl http://<ALB-DNS-NAME>/health
+```
+
+Or open in browser:
+```
+👉 http://<ALB-DNS-NAME>
+```
+8. Logs & Monitoring
+
+Logs available in CloudWatch under:
+
+/ecs/devops-task
+
+
+ECS Task logs stream app output.
+
+📊 Deployment Proof
+
+Inside deployment-proof/
+:
+
+public_url.txt → contains ALB DNS name.
+
+screenshots/ → Jenkins pipeline, ECS console, logs.
+
+pipeline_logs.txt → sample Jenkins console logs.
+
+📐 Architecture Diagram
+
+Flow:
+Developer → GitHub → Jenkins → ECR → ECS (Fargate) → ALB → End User
+Logs → CloudWatch
+
+✍️ Author
+
+Name: Abhinav Ellath
+
+Assignment: DevOps Trainee Task
