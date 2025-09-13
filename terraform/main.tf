@@ -153,7 +153,7 @@ resource "aws_ecs_task_definition" "task" {
   container_definitions = jsonencode([
     {
       name      = "devops-task"
-      image     = "amazon/amazon-ecs-sample" # Jenkins will override later
+      image     = "022499046282.dkr.ecr.${var.aws_region}.amazonaws.com/${var.app_name}-ecr:latest"
       essential = true
       portMappings = [
         { containerPort = 3000, protocol = "tcp" }
@@ -168,7 +168,10 @@ resource "aws_ecs_task_definition" "task" {
       }
     }
   ])
+
+  depends_on = [aws_cloudwatch_log_group.ecs_logs]
 }
+
 
 resource "aws_ecs_service" "service" {
   name            = "${var.app_name}-service"
