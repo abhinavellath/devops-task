@@ -1,4 +1,4 @@
-# 🔧 Tools & Services Used
+## 🔧 Tools & Services Used
 
 1. AWS ECS (Fargate) → For container orchestration & serverless compute.
 
@@ -14,7 +14,7 @@
 
 7. GitHub → Version control & project repository.
 
-# 🚧 Challenges Faced & Solutions
+## 🚧 Challenges Faced & Solutions
 
  **ECR Image Pull Failure (latest: not found)**
 
@@ -40,7 +40,7 @@ Cause: Tasks couldn’t pull images or connect to the internet.
 
 Solution: Ensured ECS task was launched in a VPC with proper subnets, route tables, and an attached Internet Gateway / NAT Gateway.
 
-# 💡 Possible Improvements
+## 💡 Possible Improvements
 
 1. Blue-Green / Rolling Deployments → Safer ECS updates without downtime.
 
