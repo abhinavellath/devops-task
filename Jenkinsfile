@@ -38,30 +38,36 @@ pipeline {
         }
 
         stage('AWS ECR Login & Push') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-                    sh '''
-                        aws configure set region ${AWS_REGION}
-                        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-                        ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
+    steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+            sh '''
+                aws configure set region ${AWS_REGION}
+                ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+                ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
 
-                        # Ensure ECR repository exists
-                        aws ecr describe-repositories --repository-names ${ECR_REPO} --region ${AWS_REGION} || \
-                        aws ecr create-repository --repository-name ${ECR_REPO} --region ${AWS_REGION}
+                # Ensure ECR repository exists
+                aws ecr describe-repositories --repository-names ${ECR_REPO} --region ${AWS_REGION} || \
+                aws ecr create-repository --repository-name ${ECR_REPO} --region ${AWS_REGION}
 
-                        # Login to ECR
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_URI}
+                # Login to ECR
+                aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_URI}
 
-                        # Tag and push Docker image
-                        docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
-                        docker push ${ECR_URI}:${IMAGE_TAG}
+                # Tag with build number and latest
+                docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
+                docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_URI}:latest
 
-                        echo "IMAGE_URI=${ECR_URI}:${IMAGE_TAG}" > image_uri.txt
-                    '''
-                }
-                archiveArtifacts artifacts: 'image_uri.txt', onlyIfSuccessful: true
-            }
+                # Push both tags
+                docker push ${ECR_URI}:${IMAGE_TAG}
+                docker push ${ECR_URI}:latest
+
+                # Save only build-tagged image for ECS
+                echo "IMAGE_URI=${ECR_URI}:${IMAGE_TAG}" > image_uri.txt
+            '''
         }
+        archiveArtifacts artifacts: 'image_uri.txt', onlyIfSuccessful: true
+    }
+}
+
 
         stage('Load Terraform Outputs') {
             steps {
