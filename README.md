@@ -151,9 +151,9 @@ Inside deployment-proof/
 
 public_url.txt → contains ALB DNS name.
 
-screenshots/ → Jenkins pipeline, ECS console, logs.
+screenshots/ → Webpage, Jenkins pipeline, ECS console, logs.
 
-pipeline_logs.txt → sample Jenkins console logs.
+
 
 📐 Architecture Diagram
 
@@ -165,4 +165,4 @@ Logs → CloudWatch
 
 Name: Abhinav Ellath
 
-Assignment: DevOps Trainee Task
+Assignment: DevOps Engineer Task
