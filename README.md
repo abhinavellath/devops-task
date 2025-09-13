@@ -161,7 +161,7 @@ Flow:
 
 <img src="https://github.com/abhinavellath/devops-task/blob/main/assets/architecture.png" alt="Banner" />
 
-✍️ Author
+## ✍️ Author
 
 Name: Abhinav Ellath
 
