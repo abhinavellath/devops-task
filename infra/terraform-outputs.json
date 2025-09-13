@@ -2,7 +2,7 @@
   "alb_dns": {
     "sensitive": false,
     "type": "string",
-    "value": "devops-task-alb-1783691009.us-east-1.elb.amazonaws.com"
+    "value": "devops-task-alb-805635095.us-east-1.elb.amazonaws.com"
   },
   "ecr_repo_url": {
     "sensitive": false,
