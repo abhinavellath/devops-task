@@ -158,6 +158,7 @@ screenshots/ → Webpage, Jenkins pipeline, ECS console, logs.
 📐 Architecture Diagram
 
 Flow:
+
 <img src="https://github.com/abhinavellath/devops-task/blob/main/assets/architecture.png" alt="Banner" />
 
 ✍️ Author
