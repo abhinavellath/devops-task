@@ -158,8 +158,7 @@ screenshots/ → Webpage, Jenkins pipeline, ECS console, logs.
 📐 Architecture Diagram
 
 Flow:
-Developer → GitHub → Jenkins → ECR → ECS (Fargate) → ALB → End User
-Logs → CloudWatch
+<img src="https://github.com/abhinavellath/devops-task/blob/main/assets/architecture.png" alt="Banner" />
 
 ✍️ Author
 
